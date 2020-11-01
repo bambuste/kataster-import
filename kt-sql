@@ -50,10 +50,10 @@ if [[ -d fpu && "$(ls -A fpu)" ]]; then
 		fpuc=$(sed 's/\.FPU$/\.fpuc/I' <<< $file)
 	
 		echo "* Cistenie FPU ($file) ..."
-		kt-vycisti_fuvi $file IBM852 > $fpuc || (echo "I: Opakujem cistenie s kodovanim 'CP1250'"; kt-vycisti_fuvi $file CP1250 > $fpuc)
+		kt-vycisti_fuvi.py $file IBM852 > $fpuc || (echo "I: Opakujem cistenie s kodovanim 'CP1250'"; kt-vycisti_fuvi.py $file CP1250 > $fpuc)
 	
 		echo "* Konverzia FPU do SQL ($file) ..."
-		kt-import_fuvi $fpuc > $ROOT_DIR/sql_p/$(basename $file).sql
+		kt-import_fuvi.py $fpuc > $ROOT_DIR/sql_p/$(basename $file).sql
 	done;
 
 else
@@ -64,7 +64,7 @@ else
 	echo "* Konverzia DBF do SQL ..."
 	for file in $(find "$ROOT_DIR/dbf" -iname "*.DBF"); do
 		echo "* Konverzia DBF do SQL ($file) ..."
-		kt-import_dbf2 $file > $ROOT_DIR/sql_p/$(basename $file).sql
+		kt-import_dbf2.py $file > $ROOT_DIR/sql_p/$(basename $file).sql
 	done;
 fi
 
@@ -78,24 +78,24 @@ echo;
 #
 # KN
 echo "* Konverzia KN do SQL (KATUZ, KLADPAR, LINIE, POPIS, ZAPPAR, ZNACKY, ZUOB) ..."
-find vgi -iname "KN*.vgi" -exec kt-vgi2shp -f sql-copy -t -k -l -p -r -n -z -o sql_g "{}" \; &> log/vgi-kn-sql.log
+find vgi -iname "KN*.vgi" -exec kt-vgi2shp.py -f sql-copy -t -k -l -p -r -n -z -o sql_g "{}" \; &> log/vgi-kn-sql.log
 
 echo "* Konverzia KN do SHP (vsetky najdene vrstvy)..."
-find vgi -iname "KN*.vgi" -exec kt-vgi2shp -f shp -o shp "{}" \; &> log/vgi-kn-shp.log
+find vgi -iname "KN*.vgi" -exec kt-vgi2shp.py -f shp -o shp "{}" \; &> log/vgi-kn-shp.log
 
 echo "* Konverzia KN do DGN (vsetky najdene vrstvy)..."
-find vgi -iname "KN*.vgi" -exec kt-vgi2shp -f dgn -o dgn "{}" \; &> log/vgi-kn-dgn.log
+find vgi -iname "KN*.vgi" -exec kt-vgi2shp.py -f dgn -o dgn "{}" \; &> log/vgi-kn-dgn.log
 
 
 # UO
 echo "* Konverzia UO do SQL (UOV)..."
-find vgi -iname "UO*.vgi" -exec kt-vgi2shp -f sql-copy -u -o sql_g "{}" \; &> log/vgi-uo-sql.log
+find vgi -iname "UO*.vgi" -exec kt-vgi2shp.py -f sql-copy -u -o sql_g "{}" \; &> log/vgi-uo-sql.log
 
 echo "* Konverzia UO do SHP (vsetky najdene vrstvy)..."
-find vgi -iname "UO*.vgi" -exec kt-vgi2shp -f shp -o shp "{}" \; &> log/vgi-uo-shp.log
+find vgi -iname "UO*.vgi" -exec kt-vgi2shp.py -f shp -o shp "{}" \; &> log/vgi-uo-shp.log
 
 echo "* Konverzia UO do DGN (vsetky najdene vrstvy)..."
-find vgi -iname "UO*.vgi" -exec kt-vgi2shp -f dgn -o dgn "{}" \; &> log/vgi-uo-dgn.log
+find vgi -iname "UO*.vgi" -exec kt-vgi2shp.py -f dgn -o dgn "{}" \; &> log/vgi-uo-dgn.log
 
 
 echo "* Spajanie SQL suborov grafickych dat ..."

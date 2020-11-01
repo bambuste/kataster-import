@@ -42,7 +42,7 @@ class Volby(object):
 			'n': ('ZNACKY', u'mapové značky okrem značiek druhov pozemkov'),
 			'z': ('ZUOB', u'hranica zastavaného územia obce'),
 		}
-		for param, vrstva_info in zname_vrstvy.iteritems():
+		for param, vrstva_info in zname_vrstvy.items():
 			parser.add_argument('-%s' % param, nargs='?', const=vrstva_info[0],
 					metavar=vrstva_info[0], help="import '%s' layer (%s)" % vrstva_info)
 
@@ -58,12 +58,13 @@ class Volby(object):
 		self.spracuj_nezname_vrstvy = args.spracuj_nezname_vrstvy
 
 		# zoznam zadanych vrstiev ako dictionary s polozkami {VRSTVA: NAZOV_VYSTUPNEJ_VRSTVY}
-		vrstvy = {zname_vrstvy[arg][0]: value for arg, value in vars(args).iteritems() if arg in zname_vrstvy and value}
+		vrstvy = {zname_vrstvy[arg][0]: value for arg, value in vars(args).items() if arg in zname_vrstvy and value}
 		# v pripade ze nie je zvolena ziadna vrstva, nastavi spracovanie vsetkych
 		if not vrstvy and not args.spracuj_nezname_vrstvy:
-			vrstvy = {vrstva_info[0]: vrstva_info[0] for vrstva_info in zname_vrstvy.itervalues()}
+			vrstvy = {vrstva_info[0]: vrstva_info[0] for vrstva_info in zname_vrstvy.values()}
 			self.spracuj_nezname_vrstvy = True
 		self.vrstvy = vrstvy
 
 
 # vim: set ts=4 sts=4 sw=4 noet:
+

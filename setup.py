@@ -54,6 +54,7 @@ setup(
 	package_dir={'katastertools': 'katastertools'},
 	packages=packages,
 	package_data={'katastertools': package_data},
+	setup_requires=['GDAL', 'dbf'],
 	scripts=['kt-vgi2shp',
 		'kt-import_dbf2',
 		'kt-import_fuvi',
@@ -66,3 +67,4 @@ setup(
 
 
 # vim: set ts=4 sts=4 sw=4 noet:
+
