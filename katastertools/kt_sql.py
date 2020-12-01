@@ -84,16 +84,16 @@ def generate_sql(directory: Path, choices: dict):
 
 
 def generate_shp(directory: Path, choices: dict):
-    print("* Converting KN into SHP (all found layers)...")
+    choices['layers'] = {k: v[0] for k, v in KNOWN_LAYERS.items() if k in ('t', 'k', 'l', 'p', 'r', 'n', 'z',)}
     choices['output_format'] = 'shp'
     choices['output_directory'] = directory / 'shp'
+
+    print("* Converting KN into SHP (all found layers)...")
     for f in (directory / 'vgi').rglob('KN*.vgi'):
         choices['file_path'] = f
         process_files(**choices)
 
     print("* Converting UO into SHP (all found layers)...")
-    choices['output_format'] = 'shp'
-    choices['output_directory'] = directory / 'shp'
     for f in (directory / 'vgi').rglob('UO*.vgi'):
         choices['file_path'] = f
         process_files(**choices)
