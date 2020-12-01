@@ -54,6 +54,8 @@ def process_descriptive_files(directory: Path):
             for line in result:
                 f_sql.write(f'{line}\n')
 
+    join_sql_files(directory / 'sql_p', directory / 'sql' / 'popisne_udaje.sql')
+
 
 def process_geometry_files(directory: Path, choices: dict, export_format: str):
     if export_format == 'sql':
@@ -78,6 +80,8 @@ def generate_sql(directory: Path, choices: dict):
         choices['file_path'] = f
         process_files(**choices)
 
+    join_sql_files(choices['output_directory'], directory / 'sql' / 'graficke_udaje.sql')
+
 
 def generate_shp(directory: Path, choices: dict):
     print("* Converting KN into SHP (all found layers)...")
@@ -87,12 +91,21 @@ def generate_shp(directory: Path, choices: dict):
         choices['file_path'] = f
         process_files(**choices)
 
-    print("* Converting uo into SHP (all found layers)...")
+    print("* Converting UO into SHP (all found layers)...")
     choices['output_format'] = 'shp'
     choices['output_directory'] = directory / 'shp'
     for f in (directory / 'vgi').rglob('UO*.vgi'):
         choices['file_path'] = f
         process_files(**choices)
+
+
+def join_sql_files(directory: Path, output_file_path: Path):
+    print(f'  * Joining SQL files in directory: {str(directory)}..')
+    with open(output_file_path, 'w') as output_f:
+        for file_path in directory.rglob('*.sql'):
+            with open(file_path, 'r') as input_f:
+                output_f.writelines(input_f.readlines())
+    print(f'  * File "{str(output_file_path)}" was generated.')
 
 
 @click.command()
@@ -130,6 +143,9 @@ def main(ctx, directory: Path, export_format: str):
     }
 
     process_geometry_files(directory, choices, export_format)
+
+    print(f'{"-" * 100}')
+    print('Conversion finished.')
 
 
 def start():
