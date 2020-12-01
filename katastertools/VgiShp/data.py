@@ -4,6 +4,7 @@ import os
 import re
 import math
 import logging
+from typing import Optional
 
 from osgeo import ogr
 
@@ -21,18 +22,17 @@ class Objekt:
     def __init__(self, atributy_suboru):
         # v spravach sa zbieraju chybove hlasky ktore sa po spracovani vypisu
         self.spravy = []
+        self.wl: Optional[WktPolygon] = None
 
         # atributy objektu su pre kazdy objekt ine
-        self.atributy_objektu = {}
-        self.atributy_objektu['ID'] = ''
+        self.atributy_objektu = {'ID': ''}
         # atributy suboru su rovnake pre vsetky objektu v danom subore
         self.atributy_suboru = atributy_suboru
 
         self.textove_elementy = []
 
         # meta informacie atributov ktore su potrebne pre spravne vytvorenie vystupneho suboru
-        self.meta = {'nazov_vrstvy': self.nazov_vrstvy}
-        self.meta['polia'] = []
+        self.meta = {'nazov_vrstvy': self.nazov_vrstvy, 'polia': []}
         self.meta['polia'].append({'nazov': 'o_id', 'typ': 'OFTInteger'})
         self.meta['polia'].append({'nazov': 'ku', 'typ': 'OFTInteger', 'sirka': 6})
         self.meta['polia'].extend(self.polia)
@@ -42,16 +42,16 @@ class Objekt:
         # regex vyrazy riadkov suboru, druhy parameter je prefix funkcie ?_riadok ktora ma
         # dany riadok spracovat
         self.reg_riadky = (
-            (re.compile(r"""(&L +)?P (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?)(?P<info>.*)"""), 'p'),
-            (re.compile(r"""(L|C|R) (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?)(?P<info>.*)"""), 'lc'),
+            (re.compile(r"(&L +)?P (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?)(?P<info>.*)"), 'p'),
+            (re.compile(r"([LCR]) (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?)(?P<info>.*)"), 'lc'),
             # obluky sa spracuvavaju ako ciary
             # (re.compile(r"""(R|NR) (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?)"""), 'r'),
-            (re.compile(r"""(NL|NC|NR) (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?)(?P<info>.*)"""), 'n'),
+            (re.compile(r"(NL|NC|NR) (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?)(?P<info>.*)"), 'n'),
             (re.compile(r"""&A (?P<nazov>.{1,6})=(?P<hodnota>.{1,40})"""), 'a'),
             (re.compile(r"""&T (?P<y>\d+(\.\d\d|\.\d)?) (?P<x>\d+(\.\d\d|\.\d)?) ['"](?P<text>.+)['"](?P<info>.*)"""),
              't'),
-            (re.compile(r"""&O (?P<nazov>.{1,8}) (?P<id>\d+)"""), 'o'),
-            (re.compile(r"""&*"""), 'vynechaj')
+            (re.compile(r"&O (?P<nazov>.{1,8}) (?P<id>\d+)"), 'o'),
+            (re.compile(r"&*"), 'vynechaj')
         )
 
         self.buffer_obluku = None  # obluk sa sklada z troch bodov, tu sa ulozi druhy, kym sa nenacita treti
@@ -92,10 +92,10 @@ class Objekt:
         self.p_riadok(data)
 
     def t_riadok(self, data):
-        text = data['text'].decode('cp852')
+        text = data['text']
         info = self.spracuj_info(data['info'])
         self.textove_elementy.append({
-            'wkt': 'POINT(%.2f %.2f)' % (-float(data['y']), -float(data['x'])),
+            'wkt': f'POINT({-float(data["y"]):.2f} {-float(data["x"]):.2f})',
             'y': -float(data['y']),
             'x': -float(data['x']),
             'text': text,
@@ -158,7 +158,7 @@ class Bodovy_objekt(Objekt):
         self.body = []
 
     def p_riadok(self, data):
-        wkt = 'POINT(%.2f %.2f)' % (-float(data['y']), -float(data['x']))
+        wkt = f'POINT({-float(data["y"]):.2f} {-float(data["x"]):.2f})'
         info = self.spracuj_info(data['info'])
         self.body.append({'wkt': wkt, 'text': '', 'info': info})
 
@@ -262,10 +262,10 @@ class Parcela(Plosny_objekt):
             pcis = hodnota
 
         kmen, podlomenie = map(int, pcis.split('.'))
-        lomeny_tvar = "%s/%d" % (kmen, podlomenie) if podlomenie > 0 else "%s" % kmen
+        lomeny_tvar = f"{kmen}/{podlomenie:d}" if podlomenie > 0 else f"{kmen}"
         if cpu:
-            lomeny_tvar = "%s-%s" % (cpu, lomeny_tvar)
-        parckey = '%06d%02d%05d%03d0' % (int(self.atributy_suboru['KU']), cpu, kmen, podlomenie)
+            lomeny_tvar = f"{cpu}-{lomeny_tvar}"
+        parckey = f'{int(self.atributy_suboru["KU"]):06d}{cpu:02d}{kmen:05d}{podlomenie:03d}0'
         return {
             'kmen': kmen,
             'podlomenie': podlomenie,
@@ -278,7 +278,7 @@ class Parcela(Plosny_objekt):
         for textovy_element in self.textove_elementy:
             h = float(textovy_element['info'].get('H', 1))
             u = float(textovy_element['info'].get('U', 0))
-            textove_data.append('%.2f;%.2f;%.1f;%.2f' % (textovy_element['y'], textovy_element['x'], h, u))
+            textove_data.append(f'{textovy_element["y"]:.2f};{textovy_element["x"]:.2f};{h:.1f};{u:.2f}')
         return '|'.join(textove_data)
 
 
@@ -299,7 +299,7 @@ class KLADPAR(Parcela):
             s = int(info.get('S', 1))
             u = float(info.get('U', 0))
             m = float(info.get('M', 1))
-            symbol = '%.2f;%.2f;%d;%.2f;%.2f' % (y, x, s, u, m)
+            symbol = f'{y:.2f};{x:.2f};{s:d};{u:.2f};{m:.2f}'
             self.symboly = self.symboly + '|' + symbol if self.symboly else symbol
 
     def spolocne_atributy(self):
@@ -307,12 +307,11 @@ class KLADPAR(Parcela):
             'g_s': self.symboly
         }
 
-        logging.debug("  Konvertujem PARCIS: %s", self.atributy_objektu.get('PARCIS'))
+        logging.debug(f"  Konvertujem PARCIS: {self.atributy_objektu.get('PARCIS')}")
         try:
             atributy.update(self.spracuj_cislo_parcely(self.atributy_objektu['PARCIS']))
         except:
-            logging.error("Zly PARCIS %s v objekte %s", self.atributy_objektu.get('PARCIS'),
-                          self.atributy_objektu['ID'])
+            logging.error(f"Zly PARCIS {self.atributy_objektu.get('PARCIS')} v objekte {self.atributy_objektu['ID']}")
 
         atributy['t'] = self.spracuj_textovy_atribut()
         return atributy
@@ -324,11 +323,11 @@ class UOV(Parcela):
     def spolocne_atributy(self):
         atributy = {}
 
-        logging.debug("  Konvertujem UO: %s", self.atributy_objektu.get('UO'))
+        logging.debug(f"  Konvertujem UO: {self.atributy_objektu.get('UO')}")
         try:
             atributy.update(self.spracuj_cislo_parcely(self.atributy_objektu['UO']))
         except:
-            logging.error("Zly UO %s v objekte %s", self.atributy_objektu.get('UO'), self.atributy_objektu['ID'])
+            logging.error(f"Zly UO {self.atributy_objektu.get('UO')} v objekte {self.atributy_objektu['ID']}")
 
         atributy['t'] = self.spracuj_textovy_atribut()
         return atributy
@@ -435,7 +434,7 @@ class INE_BODY(Bodovy_objekt):
     )
 
     def __init__(self, atributy_suboru, nazov_vrstvy):
-        self.nazov_vrstvy = 'kn_%s' % nazov_vrstvy.lower()
+        self.nazov_vrstvy = f'kn_{nazov_vrstvy.lower()}'
         super(INE_BODY, self).__init__(atributy_suboru)
 
     def geometricke_objekty(self):
@@ -452,7 +451,7 @@ class INE_BODY(Bodovy_objekt):
 
 class INE_LINIE(Liniovy_objekt):
     def __init__(self, atributy_suboru, nazov_vrstvy):
-        self.nazov_vrstvy = 'kn_%s' % nazov_vrstvy.lower()
+        self.nazov_vrstvy = f'kn_{nazov_vrstvy.lower()}'
         super(INE_LINIE, self).__init__(atributy_suboru)
 
 
@@ -483,7 +482,7 @@ class Vystup_vrstvy(object):
             # pridanie vynimky pre ESRI Shapefile format, ktory nepodporuje datovy typ datetime
             if self.driver == 'ESRI Shapefile' and pole['typ'] == 'OFTDateTime':
                 pole['typ'] = 'OFTDate'
-            typ = 'ogr.%s' % pole['typ']
+            typ = f'ogr.{pole["typ"]}'
 
             fd = ogr.FieldDefn(pole['nazov'], eval(typ))
             if 'sirka' in pole:
@@ -505,10 +504,10 @@ class Vystup_vrstvy(object):
                     # datetime hodnota
                     f.SetField(atribut, *hodnota)
                 else:
-                    if isinstance(hodnota, str):
-                        f.SetField(atribut, hodnota.encode(self.kodovanie))
-                    else:
-                        f.SetField(atribut, hodnota)
+                    # if isinstance(hodnota, str):
+                    #     f.SetField(atribut, hodnota.encode(self.kodovanie))
+                    # else:
+                    f.SetField(atribut, hodnota)
 
             wkt = objekt['wkt']
             geom = ogr.CreateGeometryFromWkt(wkt)
@@ -579,17 +578,17 @@ class Zapisovac:
                 kodovanie = 'cp1250'
                 # Shapefile driver vygeneruje nazvy suborov podla nazvov vrstiev
                 nazov_suboru = ''
-                nazov_vystupnej_vrstvy = '%s_%s' % (self.__nazov, nazov_vystupnej_vrstvy)
+                nazov_vystupnej_vrstvy = f'{self.__nazov}_{nazov_vystupnej_vrstvy}'
             elif self.__format == 'dgn':
                 driver = 'DGN'
-                nazov_suboru = '%s_%s.dgn' % (self.__nazov, nazov_vystupnej_vrstvy)
+                nazov_suboru = f'{self.__nazov}_{nazov_vystupnej_vrstvy}.dgn'
                 nastavenia_vrstvy = {
                     'ORIGIN': '-393839,-1232725,0',  # centeroid of Slovak rep.
                     'MASTER_UNIT_NAME': 'm'
                 }
             else:
                 driver = 'PGDump'
-                nazov_suboru = '%s_%s.sql' % (self.__nazov, nazov_vystupnej_vrstvy)
+                nazov_suboru = f'{self.__nazov}_{nazov_vystupnej_vrstvy}.sql'
                 nastavenia_vrstvy = {
                     'CREATE_TABLE': 'OFF',
                     'DROP_TABLE': 'OFF',
@@ -600,7 +599,7 @@ class Zapisovac:
                 }
             if self.__nastavenia_vrstvy:
                 nastavenia_vrstvy.update(dict(item.split("=") for item in self.__nastavenia_vrstvy))
-            nastavenia_vrstvy = ["%s=%s" % (key, value) for key, value in nastavenia_vrstvy.items()]
+            nastavenia_vrstvy = [f"{key}={value}" for key, value in nastavenia_vrstvy.items()]
 
             nazov_suboru = os.path.join(self.__cesta, nazov_suboru)
             cesta = os.path.dirname(nazov_suboru)
@@ -622,7 +621,7 @@ class HBod(object):
     """Trieda v ktorej sa ukladaju suradnice konkretneho bodu"""
 
     def __init__(self, bx, by):
-        self.__str = "-%s -%s" % (bx, by)
+        self.__str = f"-{bx} -{by}"
         self.x = float(bx)
         self.y = float(by)
 
@@ -710,7 +709,7 @@ class WktGeneric(object):
 
     def kresli(self, bx, by):
         if self.__buffer_obluku:
-            logging.warning("Nespravna definicia obluku v objekte %s", self._objekt.atributy_objektu['ID'])
+            logging.warning(f"Nespravna definicia obluku v objekte {self._objekt.atributy_objektu['ID']}")
             self.__buffer_obluku = None
 
         if not self.__index_indexov in self._ciary:
@@ -727,7 +726,7 @@ class WktGeneric(object):
                 break
 
         if self.__buffer_obluku:
-            logging.warning("Nespravna definicia obluku v objekte %s", self._objekt.atributy_objektu['ID'])
+            logging.warning(f"Nespravna definicia obluku v objekte {self._objekt.atributy_objektu['ID']}")
             self.__buffer_obluku = None
 
         if index:
@@ -771,8 +770,8 @@ class WktGeneric(object):
                         else:
                             ys = ((x2 - x1) / 2) + x1
                     else:
-                        logging.warn("Nespravna definicia obluku v objekte %s", self._objekt.atributy_objektu['ID'])
-                        self._ciary[self.__index].pridaj("%.2f" % x3, "%.2f" % y3)
+                        logging.warning(f"Nespravna definicia obluku v objekte {self._objekt.atributy_objektu['ID']}")
+                        self._ciary[self.__index].pridaj(f"{x3:.2f}", f"{y3:.2f}")
                         return False
 
             zaciatok = Bod([xs, ys], [x1, y1])
@@ -806,7 +805,7 @@ class WktGeneric(object):
                     self._ciary[self.__index].pridaj(rx, ry)
                     oza = oza - 5
 
-            self._ciary[self.__index].pridaj("%.2f" % x3, "%.2f" % y3)
+            self._ciary[self.__index].pridaj(f"{x3:.2f}", f"{y3:.2f}")
             self.__buffer_obluku = None
 
         else:
@@ -833,11 +832,11 @@ class WktLinia(WktGeneric):
             if ciary[i].pocet_bodov > 1:
                 str_ciary.append(str(ciary[i]))
             else:
-                logging.warning("Mazem (%s) v objekte %s", ciary[i], self._objekt.atributy_objektu['ID'])
+                logging.warning(f"Mazem ({ciary[i]}) v objekte {self._objekt.atributy_objektu['ID']}")
         if str_ciary:
-            return "MULTILINESTRING((%s))" % '),('.join(str_ciary)
+            return f"MULTILINESTRING(({'),('.join(str_ciary)}))"
         else:
-            logging.warning("Neplatna linia v objekte %s", self._objekt.atributy_objektu['ID'])
+            logging.warning(f"Neplatna linia v objekte {self._objekt.atributy_objektu['ID']}")
             return ""
 
 
@@ -851,16 +850,16 @@ class WktPolygon(WktGeneric):
                 if not ciary[i].zatvorena:
                     ciary[i].zatvor()
                     self.pocet_uzatvoreni += 1
-                    logging.warning("Zatvaram polygon v objekte %s", self._objekt.atributy_objektu['ID'])
+                    logging.warning(f"Zatvaram polygon v objekte {self._objekt.atributy_objektu['ID']}")
                 str_ciary.append(str(ciary[i]))
             else:
                 if ciary[i].pocet_bodov > 1:
-                    logging.warning("Mazem (%s) v objekte %s", ciary[i], self._objekt.atributy_objektu['ID'])
+                    logging.warning(f"Mazem ({ciary[i]}) v objekte {self._objekt.atributy_objektu['ID']}")
 
         if str_ciary:
-            return "POLYGON((%s))" % '),('.join(str_ciary)
+            return f"POLYGON(({'),('.join(str_ciary)}))"
         else:
-            logging.warn("Neplatny polygon v objekte %s", self._objekt.atributy_objektu['ID'])
+            logging.warning(f"Neplatny polygon v objekte {self._objekt.atributy_objektu['ID']}")
             return ""
 
 
@@ -897,7 +896,7 @@ class Bod:
         self.__y = mod * math.sin(math.radians(uhol))
 
     def get(self):
-        return "%.2f" % round(self.__x + self.__xs, 2), "%.2f" % round(self.__y + self.__ys, 2)
+        return f"{round(self.__x + self.__xs, 2):.2f}", f"{round(self.__y + self.__ys, 2):.2f}"
 
     def otoc(self, smer_otocenia=True):  # smer_otocenia: True = v smere hodinovych ruciciek
         if smer_otocenia:

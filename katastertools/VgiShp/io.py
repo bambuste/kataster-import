@@ -3,42 +3,40 @@
 import os
 import sys
 import stat
+from pathlib import Path
 
 
 class Citac:
     """Trieda starajuca sa o citanie vstupneho suboru. Citanie prebieha po riadkoch. Dokaze sa
     posuvat aj dozadu"""
 
-    def __init__(self, nazov_suboru):
+    def __init__(self, file_path: Path):
         try:
-            mode = os.stat(nazov_suboru)[stat.ST_MODE]
+            mode = os.stat(str(file_path))[stat.ST_MODE]
             if stat.S_ISREG(mode):
-                self.__subor = open(nazov_suboru, "r")
+                self._file = open(str(file_path), "r", encoding='cp1250')
 
-                if ' ' in nazov_suboru:
-                    raise MedzeraVNazveSuboru(nazov_suboru)
-                if self.__subor.read(2) != "&V":
-                    raise ZlyTypSuboru(nazov_suboru)
+                if ' ' in str(file_path):
+                    raise MedzeraVNazveSuboru(str(file_path))
+                if self._file.read(2) != "&V":
+                    raise ZlyTypSuboru(str(file_path))
             else:
-                raise NieJeSubor(nazov_suboru)
-        except OSError as vstupny_subor:
-            raise NieJeSubor(vstupny_subor)
-        except IOError as t:
-            print(t)
-            sys.exit(2)
+                raise NieJeSubor(str(file_path))
+        except OSError as e:
+            raise NieJeSubor(e)
 
-        self.__subor.seek(0)
-        self.__precitane_bajty = 0
-        self.__dlzka_riadkov = []
-        self.__precitany_riadok = self.__subor.readline()
+        self._file.seek(0)
+        self._precitane_bajty = 0
+        self._dlzka_riadkov = []
+        self._precitany_riadok = self._file.readline()
 
     def __del__(self):
         self.zavriet()
 
     def __getitem__(self, index):
-        riadok = self.__precitany_riadok
-        self.__dlzka_riadkov.append(len(riadok))
-        self.__precitane_bajty += len(riadok)
+        riadok = self._precitany_riadok
+        self._dlzka_riadkov.append(len(riadok))
+        self._precitane_bajty += len(riadok)
 
         if riadok == "":
             self.zavriet()
@@ -47,38 +45,39 @@ class Citac:
             self.zavriet()
             raise IndexError
         else:
-            self.__precitany_riadok = self.__subor.readline()
+            self._precitany_riadok = self._file.readline()
             # ak veta pokracuje na dalsom riadku vo vstupnom subore, spoj ju do jedneho riadku
-            if self.__precitany_riadok.startswith("\t"):
-                self.__precitane_bajty += len(self.__precitany_riadok)
-                self.__dlzka_riadkov[-1] += len(self.__precitany_riadok)
-                riadok = riadok.rstrip() + ' ' + self.__precitany_riadok.lstrip()
-                self.__precitany_riadok = self.__subor.readline()
+            if self._precitany_riadok.startswith("\t"):
+                self._precitane_bajty += len(self._precitany_riadok)
+                self._dlzka_riadkov[-1] += len(self._precitany_riadok)
+                riadok = riadok.rstrip() + ' ' + self._precitany_riadok.lstrip()
+                self._precitany_riadok = self._file.readline()
             return riadok.strip()
 
-    def spat(self, index):  # posunie sa spat o dany pocet riadkov
+    def spat(self, index: int):  # posunie sa spat o dany pocet riadkov
         z = 0
-        for x in self.__dlzka_riadkov[-index:]:
+        for x in self._dlzka_riadkov[-index:]:
             z += x
-        self.__precitane_bajty -= z
-        self.__subor.seek(self.__precitane_bajty)
-        self.__precitany_riadok = self.__subor.readline()
+        self._precitane_bajty -= z
+        self._file.seek(self._precitane_bajty)
+        self._precitany_riadok = self._file.readline()
+        self._precitany_riadok = self._file.readline()
 
     def zavriet(self):
-        if self.__subor:
-            self.__subor.close()
-            self.__subor = None
+        if self._file:
+            self._file.close()
+            self._file = None
 
     def je_koniec_suboru(self):
-        return self.__subor is None
+        return self._file is None
 
 
-class Citac_objektov:
+class CitacObjektov:
     """Trieda pomocou Citaca cita subor. Citanie prebieha po objektoch. V pripade potreby dokaze otocit poradie
     riadkov v objekte"""
 
-    def __init__(self, citac):
-        self.__citac = citac
+    def __init__(self, citac: Citac):
+        self.__citac: Citac = citac
         self.__koniec_suboru = False
 
     def __nacitaj_dalsi_objekt(self):
@@ -99,7 +98,7 @@ class Citac_objektov:
                 else:
                     self.__objekt.append(riadok)
         except ChybaKoncovaVeta:
-            print("E: Chyba koncova veta")
+            sys.stderr.write("[ERROR]: Chyba koncova veta\n")
             return
 
     def __getitem__(self, index):
@@ -153,7 +152,7 @@ class Citac_objektov:
                             upravene_o.append(riadok_o[1:])
                     else:
                         if skocil:
-                            upravene_o.append("N%s" % riadok_o)
+                            upravene_o.append(f"N{riadok_o}")
                             skocil = False
                         else:
                             upravene_o.append(riadok_o)
